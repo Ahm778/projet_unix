@@ -3,8 +3,18 @@
 
 #include "serv_cli_fifo.h"
 
-extern volatile sig_atomic_t reponse_recue;
-void hand_reveil(int sig);
-void fin_client(int sig);
+volatile sig_atomic_t reponse_recue = 0;
+
+void hand_reveil(int sig) {
+    (void)sig;
+    printf("Client: Signal SIGUSR1 reçu - Réponse disponible\n");
+    reponse_recue = 1;
+}
+
+void fin_client(int sig) {
+    (void)sig;
+    printf("\n❌ Client %d: Arrêt forcé\n", getpid());
+    exit(1);
+}
 
 #endif

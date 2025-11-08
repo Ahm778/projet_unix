@@ -15,17 +15,19 @@
 #define NMAX 100
 #define FIFO1 "fifo1"
 #define FIFO2 "fifo2"
-#define MAX_QUESTIONS 10
+#define MAX_QUESTIONS 100
 
 typedef struct {
     pid_t client_pid;
-    int n;  // Nombre de nombres aléatoires demandés
+    pid_t serveur_pid;  // ⭐ NOUVEAU - Le serveur envoie son PID
+    int n;
     int question_number;
     int total_questions;
 } Question;
 
 typedef struct {
     pid_t client_pid;
+    pid_t serveur_pid;  // ⭐ NOUVEAU
     int numbers[NMAX];
     int question_number;
     int total_questions;

@@ -1,5 +1,5 @@
 === PROJET COMMUNICATION CLIENT/SERVEUR ===
-Date: Thu Nov  6 20:01:41 CET 2025
+Date: Fri Nov  7 20:09:10 CET 2025
 
 FICHIERS:
 - serv_cli_fifo.h: Définitions communes

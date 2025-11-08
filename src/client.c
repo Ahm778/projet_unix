@@ -2,30 +2,16 @@
 #include "serv_cli_fifo.h"
 #include "Handlers_Cli.h"
 
-volatile sig_atomic_t reponse_recue = 0;
-
-void hand_reveil(int sig) {
-    (void)sig;
-    reponse_recue = 1;
-}
-
-void fin_client(int sig) {
-    printf("\n❌ Client %d: Arrêt forcé\n", getpid());
-    exit(1);
-}
-
 int main() {
     int fd_fifo1, fd_fifo2;
     Question question;
     Reponse reponse;
     int total_questions;
+    pid_t serveur_pid = 0;  // Sera rempli par le serveur
     
     printf("\n=== CLIENT (PID: %d) ===\n", getpid());
     
-    // Masquer signaux clavier
     masquer_signaux_clavier();
-    
-    // Installer handlers
     signal(SIGTERM, fin_client);
     signal(SIGUSR1, hand_reveil);
     
@@ -35,13 +21,11 @@ int main() {
         return 1;
     }
     
-    // Vider buffer
     int c;
     while ((c = getchar()) != '\n' && c != EOF);
     
     printf("🔗 Connexion au serveur...\n");
     
-    // Ouverture FIFOs
     fd_fifo1 = open(FIFO1, O_WRONLY);
     if (fd_fifo1 == -1) {
         perror("❌ FIFO1");
@@ -71,10 +55,8 @@ int main() {
         printf("📤 Q%d/%d: %d nombres → ", i, total_questions, question.n);
         fflush(stdout);
         
-        // Envoi question
         write(fd_fifo1, &question, sizeof(Question));
         
-        // Attente réponse
         reponse_recue = 0;
         int timeout = 0;
         
@@ -82,10 +64,11 @@ int main() {
             sleep(1);
             timeout++;
             
-            // Vérification non-bloquante
             int bytes_read = read(fd_fifo2, &reponse, sizeof(Reponse));
             if (bytes_read == sizeof(Reponse) && reponse.client_pid == getpid()) {
                 reponse_recue = 1;
+                // ⭐ RÉCUPÉRATION DU PID DU SERVEUR
+                serveur_pid = reponse.serveur_pid;
             }
         }
         
@@ -96,6 +79,12 @@ int main() {
             }
             printf("\n");
             succes++;
+            
+            // ⭐ ENVOI AU VRAI PID DU SERVEUR
+            if (serveur_pid > 0) {
+                kill(serveur_pid, SIGUSR1);
+            }
+            
         } else {
             printf("⏰ Timeout\n");
         }
