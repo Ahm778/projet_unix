@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Système Client/Serveur FIFO</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2c3e50, #34495e);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header .subtitle {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0;
+            min-height: 600px;
+        }
+
+        .panel {
+            padding: 30px;
+            border-right: 1px solid #eee;
+        }
+
+        .panel:last-child {
+            border-right: none;
+            background: #f8f9fa;
+        }
+
+        .panel-title {
+            font-size: 1.5em;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #3498db;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #34495e;
+        }
+
+        input, select, button {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: #3498db;
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+        }
+
+        button {
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            margin-top: 10px;
+            transition: all 0.3s ease;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(52, 152, 219, 0.3);
+        }
+
+        button:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #27ae60, #229954);
+        }
+
+        .status {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            font-weight: 500;
+            text-align: center;
+        }
+
+        .status.connected {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status.disconnected {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .log {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 15px;
+            border-radius: 8px;
+            height: 300px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            margin-top: 20px;
+        }
+
+        .log-entry {
+            margin-bottom: 8px;
+            padding: 5px;
+            border-left: 3px solid #3498db;
+            padding-left: 10px;
+            background: rgba(255,255,255,0.05);
+        }
+
+        .log-entry.success {
+            border-left-color: #27ae60;
+            color: #27ae60;
+        }
+
+        .log-entry.error {
+            border-left-color: #e74c3c;
+            color: #e74c3c;
+        }
+
+        .log-entry.warning {
+            border-left-color: #f39c12;
+            color: #f39c12;
+        }
+
+        .log-entry.info {
+            border-left-color: #3498db;
+            color: #3498db;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border: 1px solid #e0e0e0;
+        }
+
+        .stat-number {
+            font-size: 2em;
+            font-weight: bold;
+            color: #3498db;
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            color: #7f8c8d;
+            margin-top: 5px;
+        }
+
+        .button-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        @media (max-width: 768px) {
+            .content {
+                grid-template-columns: 1fr;
+            }
+            
+            .panel {
+                border-right: none;
+                border-bottom: 1px solid #eee;
+            }
+            
+            .button-group {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 Système Client/Serveur FIFO</h1>
+            <div class="subtitle">Communication par tubes nommés - Interface Web</div>
+        </div>
+        
+        <div class="content">
+            <!-- Panneau de Contrôle -->
+            <div class="panel">
+                <div class="panel-title">🎯 Contrôle du Système</div>
+                
+                <div class="form-group">
+                    <label>Serveur C:</label>
+                    <div class="button-group">
+                        <button onclick="fifoSystem.startServer()">🚀 Démarrer le serveur</button>
+                        <button onclick="fifoSystem.stopServer()" class="btn-danger">🛑 Arrêter le serveur</button>
+                    </div>
+                </div>
+                
+                <div id="serverStatus" class="status disconnected">
+                    🔴 Serveur C arrêté
+                </div>
+
+                <div class="form-group">
+                    <label for="totalQuestions">Nombre de questions (1-100):</label>
+                    <input type="number" id="totalQuestions" min="1" max="100" value="5">
+                </div>
+                
+                <div class="form-group">
+                    <label for="maxNumbers">Nombres maximum par question:</label>
+                    <input type="number" id="maxNumbers" min="1" max="100" value="10">
+                </div>
+
+                <div class="form-group">
+                    <label>Clients C:</label>
+                    <div class="button-group">
+                        <button onclick="fifoSystem.startClient()">👤 Lancer un client</button>
+                        <button onclick="fifoSystem.startMultipleClients()" class="btn-success">👥 Lancer 3 clients</button>
+                    </div>
+                </div>
+                
+                <div class="stats">
+                    <div class="stat-card">
+                        <div class="stat-number" id="clientsConnected">0</div>
+                        <div class="stat-label">Clients connectés</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="requestsProcessed">0</div>
+                        <div class="stat-label">Requêtes traitées</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Panneau Monitoring -->
+            <div class="panel">
+                <div class="panel-title">📊 Monitoring Temps Réel</div>
+                
+                <div class="form-group">
+                    <label>État du système:</label>
+                    <div id="systemStatus" class="status disconnected">
+                        🔴 Système arrêté
+                    </div>
+                </div>
+
+                <div class="stats">
+                    <div class="stat-card">
+                        <div class="stat-number" id="serverPid">-</div>
+                        <div class="stat-label">PID Serveur</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="activeClients">0</div>
+                        <div class="stat-label">Clients actifs</div>
+                    </div>
+                </div>
+
+                <div class="panel-title" style="margin-top: 30px;">📋 Journal d'activité</div>
+                <div class="log" id="activityLog">
+                    <div class="log-entry info">Système initialisé. Connectez-vous au serveur WebSocket...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
