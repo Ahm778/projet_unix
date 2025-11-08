@@ -4,15 +4,14 @@
 #include <sys/wait.h>
 
 int main() {
-    int fd_fifo1;
+    int fd_fifo1, fd_fifo2;
     Question question;
     
-    printf("=== SERVEUR MULTI-CLIENTS (PID: %d) ===\n", getpid());
+    printf("=== SERVEUR SEQUENTIEL (PID: %d) ===\n", getpid());
     
     masquer_signaux_clavier();
     signal(SIGTERM, fin_serveur);
     signal(SIGUSR1, hand_reveil);
-    signal(SIGCHLD, SIG_IGN);
     
     printf("Nettoyage des anciens FIFOs...\n");
     unlink(FIFO1);
@@ -29,63 +28,85 @@ int main() {
         exit(1);
     }
     
-    printf("Ouverture des FIFOs...\n");
+    printf("Ouverture des FIFOs (le serveur ouvre les deux en premier)...\n");
+    
+    // ⭐ OUVERTURE SIMULTANÉE des deux FIFOs pour éviter les blocages
     fd_fifo1 = open(FIFO1, O_RDONLY);
     if (fd_fifo1 == -1) {
         perror("open FIFO1");
         exit(1);
     }
     
+    fd_fifo2 = open(FIFO2, O_WRONLY);
+    if (fd_fifo2 == -1) {
+        perror("open FIFO2");
+        close(fd_fifo1);
+        exit(1);
+    }
+    
     printf("╔══════════════════════════════════════╗\n");
-    printf("║         SERVEUR ACTIF (PID: %d)      ║\n", getpid());
-    printf("║  Utilisez 'kill %d' pour arrêter     ║\n", getpid());
+    printf("║     SERVEUR ACTIF (PID: %d)          ║\n", getpid());
+    printf("║  Prêt à recevoir des requêtes...     ║\n");
     printf("╚══════════════════════════════════════╝\n\n");
     
+    srand((unsigned int)time(NULL) ^ (unsigned int)getpid());
+    
     while(1) {
+        printf("🕐 En attente de requête...\n");
         int bytes_read = read(fd_fifo1, &question, sizeof(Question));
         
         if(bytes_read == sizeof(Question)) {
-            printf("📨 Client %d: Question %d/%d (%d nombres)\n", 
-                   question.client_pid, question.question_number, 
-                   question.total_questions, question.n);
+            Reponse reponse;
             
-            if (fork() == 0) {
-                Reponse reponse;
-                int fd_fifo2_child = open(FIFO2, O_WRONLY);
-                if (fd_fifo2_child == -1) {
-                    perror("open FIFO2");
-                    exit(1);
-                }
-                
-                srand((unsigned int)time(NULL) ^ (unsigned int)getpid());
-                
-                // ⭐ LE SERVEUR ENVOIE SON PID AU CLIENT
-                reponse.client_pid = question.client_pid;
-                reponse.serveur_pid = getpid();  // ⭐ PID du serveur
-                reponse.question_number = question.question_number;
-                reponse.total_questions = question.total_questions;
-                
-                for(int i = 0; i < question.n; i++) {
-                    reponse.numbers[i] = rand() % NMAX + 1;
-                }
-                
-                sleep(1);
-                write(fd_fifo2_child, &reponse, sizeof(Reponse));
-                close(fd_fifo2_child);
-                
-                printf("📤 Réponse à client %d (Q%d/%d)\n", 
-                       question.client_pid, question.question_number, question.total_questions);
-                
-                kill(question.client_pid, SIGUSR1);
-                exit(0);
+            printf("📨 Requête reçue du client %d\n", question.client_pid);
+            printf("   Question %d/%d (%d nombres)\n", 
+                   question.question_number, question.total_questions, question.n);
+            
+            // Préparation de la réponse
+            reponse.client_pid = question.client_pid;
+            reponse.serveur_pid = getpid();
+            reponse.question_number = question.question_number;
+            reponse.total_questions = question.total_questions;
+            
+            // Génération des nombres aléatoires
+            for(int i = 0; i < question.n; i++) {
+                reponse.numbers[i] = rand() % NMAX + 1;
             }
-        } else if (bytes_read == -1) {
-            perror("read FIFO1");
+            
+            // Simulation du traitement
             sleep(1);
+            
+            // Envoi de la réponse
+            printf("📤 Envoi réponse au client %d...\n", question.client_pid);
+            write(fd_fifo2, &reponse, sizeof(Reponse));
+            
+            printf("✅ Réponse envoyée (Q%d/%d)\n", 
+                   question.question_number, question.total_questions);
+            
+            // Réveil du client
+            kill(question.client_pid, SIGUSR1);
+            printf("🔔 Signal SIGUSR1 envoyé au client %d\n\n", question.client_pid);
+            
+        } else if (bytes_read == -1) {
+            perror("❌ Erreur read FIFO1");
+            sleep(1);
+        } else if (bytes_read == 0) {
+            printf("⚠️  FIFO1 fermé, réouverture...\n");
+            close(fd_fifo1);
+            close(fd_fifo2);
+            
+            // Réouverture
+            fd_fifo1 = open(FIFO1, O_RDONLY);
+            fd_fifo2 = open(FIFO2, O_WRONLY);
+            if (fd_fifo1 == -1 || fd_fifo2 == -1) {
+                perror("Réouverture FIFOs");
+                break;
+            }
         }
     }
     
     close(fd_fifo1);
+    close(fd_fifo2);
     unlink(FIFO1);
     unlink(FIFO2);
     return 0;

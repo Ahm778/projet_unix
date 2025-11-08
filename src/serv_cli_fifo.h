@@ -36,13 +36,11 @@ typedef struct {
 static inline void masquer_signaux_clavier(void) {
     signal(SIGINT, SIG_IGN);
     signal(SIGQUIT, SIG_IGN);
-    signal(SIGTSTP, SIG_IGN);
 }
 
 static inline void retablir_signaux_clavier(void) {
     signal(SIGINT, SIG_DFL);
     signal(SIGQUIT, SIG_DFL);
-    signal(SIGTSTP, SIG_DFL);
 }
 
 #endif
